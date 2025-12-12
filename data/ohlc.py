@@ -1,45 +1,40 @@
-import yfinance as yf
 import pandas as pd
 from datetime import timedelta
 
 from data.candle import Candle
 
 
+FILE_MAP = {
+    "15m": "data/raw/EURUSD_15m.csv",
+    "1h": "data/raw/EURUSD_1h.csv",
+    "4h": "data/raw/EURUSD_4h.csv",
+    "1d": "data/raw/EURUSD_1d.csv",
+    "1wk": "data/raw/EURUSD_1wk.csv",
+}
+
+
 class OHLC:
     def __init__(self, symbol, interval):
-        self.symbol = symbol
-        self.interval = interval
+        self.symbol = symbol          # "EURUSD" (not used for loading, but kept for clarity)
+        self.interval = interval      # "15m", "1h", "4h", "1d", "1wk"
 
-        if interval == "15m":
-            period = "60d"
-        elif interval in ["1h", "4h"]:
-            period = "730d"
-        else:
-            period = "max"
+        path = FILE_MAP[interval]
 
-        raw = yf.download(
-            tickers=self.symbol,
-            interval=self.interval,
-            period=period,
-            auto_adjust=False,
-            progress=False,
-        )
+        # Read CSV saved by oanda_fetch.py
+        df = pd.read_csv(path, parse_dates=["time"])
+        df.set_index("time", inplace=True)
 
-        if isinstance(raw.columns, pd.MultiIndex):
-            df = raw.copy()
-            df.columns = [str(col[0]) for col in raw.columns]
-        else:
-            df = raw.copy()
-            df.columns = [str(c) for c in raw.columns]
-
+        # Keep raw data (index is in UTC, naive)
         self.data = df
 
         idx = df.index
         if not isinstance(idx, pd.DatetimeIndex):
             idx = pd.to_datetime(idx)
         if idx.tz is None:
+            # OANDA timestamps are UTC
             idx = idx.tz_localize("UTC")
 
+        # Convert to New York time
         idx_nyt = idx.tz_convert("America/New_York")
 
         candles = []
@@ -52,14 +47,15 @@ class OHLC:
             if pd.isna(o) or pd.isna(h) or pd.isna(l) or pd.isna(c):
                 continue
 
+            # Time handling per timeframe
             if self.interval in ["15m", "1h", "4h"]:
-                # NY clock time, but drop tzinfo so no "-05:00" prints
+                # NY clock time, no tzinfo so we don't print "-05:00"
                 time_value = ts_nyt.replace(tzinfo=None)
             elif self.interval == "1d":
-                # session day = date of the 00:00 candle in the 17:00–17:00 NYT day
+                # Session day (17:00–17:00 NY) = date of the 00:00 candle
                 time_value = (ts_nyt + timedelta(hours=7)).date()
             elif self.interval == "1wk":
-                # weekly: Monday date for that session week
+                # Weekly: Monday of that session week
                 shifted = ts_nyt + timedelta(hours=7)
                 d = shifted.date()
                 monday = d - timedelta(days=d.weekday())
@@ -77,6 +73,6 @@ class OHLC:
 TIMEFRAMES = ["15m", "1h", "4h", "1d", "1wk"]
 
 ohlc_by_timeframe = {
-    tf: OHLC("EURUSD=X", tf)
+    tf: OHLC("EURUSD", tf)
     for tf in TIMEFRAMES
 }

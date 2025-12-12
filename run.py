@@ -1,17 +1,21 @@
-from array_definitions.swing_hl import detect_swing_highs, detect_swing_lows
+from array_definitions.weekly_liquidity import get_weekly_liquidity, detect_weekly_swing_highs, detect_weekly_swing_lows
 
 def main():
-    sh = detect_swing_highs()
-    sl = detect_swing_lows()
+    w = get_weekly_liquidity()
+    print("Weekly PD levels:")
+    for k, v in w.items():
+        print(f"  {k}: {v}")
 
-    for tf in sh:
-        print(f"\nTimeframe: {tf}")
-        print("  last 5 swing highs:")
-        for s in sh[tf][-5:]:
-            print(f"    {s}")
-        print("  last 5 swing lows:")
-        for s in sl[tf][-5:]:
-            print(f"    {s}")
+    sh = detect_weekly_swing_highs()
+    sl = detect_weekly_swing_lows()
+
+    print("\nLast 5 weekly swing highs:")
+    for x in sh[-5:]:
+        print(" ", x)
+
+    print("\nLast 5 weekly swing lows:")
+    for x in sl[-5:]:
+        print(" ", x)
 
 if __name__ == "__main__":
     main()
